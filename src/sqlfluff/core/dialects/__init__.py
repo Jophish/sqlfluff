@@ -10,6 +10,7 @@ from sqlfluff.core.dialects.dialect_postgres import postgres_dialect
 from sqlfluff.core.dialects.dialect_snowflake import snowflake_dialect
 from sqlfluff.core.dialects.dialect_exasol import exasol_dialect
 from sqlfluff.core.dialects.dialect_exasol_fs import exasol_fs_dialect
+from sqlfluff.core.dialects.dialect_hive import hive_dialect
 
 
 _dialect_lookup = {
@@ -21,6 +22,7 @@ _dialect_lookup = {
     "snowflake": snowflake_dialect,
     "exasol": exasol_dialect,
     "exasol_fs": exasol_fs_dialect,
+    "hive": hive_dialect,
 }
 
 
