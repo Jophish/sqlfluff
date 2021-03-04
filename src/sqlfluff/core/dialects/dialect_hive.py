@@ -22,6 +22,13 @@ hive_dialect.sets("unreserved_keywords").update(UNRESERVED_KEYWORDS)
 # hive_dialect.sets("reserved_keywords").clear()
 hive_dialect.sets("reserved_keywords").update(RESERVED_KEYWORDS)
 
+hive_dialect.sets("bracket_pairs").update(
+    [
+        # NB: Angle brackets can be mistaken, so False
+        ("angle", "LessThanSegment", "GreaterThanSegment", False)
+    ]
+)
+
 
 hive_dialect.add(
     DoubleQuotedLiteralSegment=NamedSegment.make(
@@ -149,6 +156,74 @@ class CreateTableStatementSegment(BaseSegment):
                 Ref("TableReferenceSegment"),
                 Ref("LocationGrammar", optional=True),
             ),
+        ),
+    )
+
+
+@hive_dialect.segment()
+class PrimitiveTypeSegment(BaseSegment):
+    """Primitive data types."""
+
+    type = "primitive_type"
+    match_grammar = OneOf(
+        "TINYINT",
+        "SMALLINT",
+        "INT",
+        "BIGINT",
+        "BOOLEAN",
+        "FLOAT",
+        Sequence("DOUBLE", Ref.keyword("PRECISION", optional=True)),
+        "STRING",
+        "BINARY",
+        "TIMESTAMP",
+        Sequence(
+            "DECIMAL",
+            Bracketed(
+                Ref("NumericLiteralSegment"),
+                Ref("CommaSegment"),
+                Ref("NumericLiteralSegment"),
+                optional=True,
+            ),
+        ),
+        "DATE",
+        "VARCHAR",
+        "CHAR",
+    )
+
+
+@hive_dialect.segment(replace=True)
+class DatatypeSegment(BaseSegment):
+    """Data types."""
+
+    type = "data_type"
+    match_grammar = OneOf(
+        Ref("PrimitiveTypeSegment"),
+        Sequence("ARRAY", Bracketed(Ref("DatatypeSegment"), bracket_type="angle")),
+        Sequence(
+            "MAP",
+            Bracketed(
+                Ref("PrimitiveTypeSegment"),
+                Ref("CommaSegment"),
+                Ref("DatatypeSegment"),
+                bracket_type="angle",
+            ),
+        ),
+        Sequence(
+            "STRUCT",
+            Bracketed(
+                Delimited(
+                    Sequence(
+                        Ref("NakedIdentifierSegment"),
+                        Ref("ColonSegment"),
+                        Ref("DatatypeSegment"),
+                    ),
+                ),
+                bracket_type="angle",
+            ),
+        ),
+        Sequence(
+            "UNIONTYPE",
+            Bracketed(Delimited(Ref("DatatypeSegment")), bracket_type="angle"),
         ),
     )
 
