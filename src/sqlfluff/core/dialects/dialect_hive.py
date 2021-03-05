@@ -60,16 +60,16 @@ hive_dialect.add(
         "JSONFILE",
         Sequence(
             "INPUTFORMAT",
-            Ref("QuotedLiteralSegment"),
+            Ref("SingleOrDoubleQuotedLiteralGrammar"),
             "OUTPUTFORMAT",
-            Ref("QuotedLiteralSegment"),
+            Ref("SingleOrDoubleQuotedLiteralGrammar"),
         ),
     ),
     StoredAsGrammar=Sequence("STORED", "AS", Ref("FileFormatGrammar")),
     StoredByGrammar=Sequence(
         "STORED",
         "BY",
-        Ref("QuotedLiteralSegment"),
+        Ref("SingleOrDoubleQuotedLiteralGrammar"),
         Ref("SerdePropertiesGrammar", optional=True),
     ),
     StorageFormatGrammar=OneOf(
@@ -110,13 +110,14 @@ class CreateTableStatementSegment(BaseSegment):
                 Bracketed(
                     Delimited(
                         OneOf(
+                            # TODO: support all constraints
                             Ref("TableConstraintSegment"),
                             Ref("ColumnDefinitionSegment"),
                         ),
                     )
                 ),
                 Ref("CommentGrammar", optional=True),
-                Sequence(  # [PARTITONED BY (col_name data_type [COMMENT col_comment], ...)]
+                Sequence(
                     "PARTITIONED",
                     "BY",
                     Bracketed(Delimited(Ref("ColumnDefinitionSegment"))),
@@ -148,6 +149,7 @@ class CreateTableStatementSegment(BaseSegment):
                 Ref("StorageFormatGrammar", optional=True),
                 Ref("LocationGrammar", optional=True),
                 Ref("TablePropertiesGrammar", optional=True),
+                Sequence("AS", Ref("SelectStatementSegment"), optional=True),
             ),
             # Create like syntax
             Sequence(
