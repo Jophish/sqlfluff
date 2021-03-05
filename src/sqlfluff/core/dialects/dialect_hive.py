@@ -19,7 +19,7 @@ hive_dialect = ansi_dialect.copy_as("hive")
 # Clear ANSI Keywords and add all Hive keywords
 # hive_dialect.sets("unreserved_keywords").clear()
 hive_dialect.sets("unreserved_keywords").update(UNRESERVED_KEYWORDS)
-# hive_dialect.sets("reserved_keywords").clear()
+hive_dialect.sets("reserved_keywords").clear()
 hive_dialect.sets("reserved_keywords").update(RESERVED_KEYWORDS)
 
 hive_dialect.sets("bracket_pairs").update(
@@ -79,6 +79,7 @@ hive_dialect.add(
         ),
         Ref("StoredByGrammar"),
     ),
+    CommentGrammar=Sequence("COMMENT", Ref("SingleOrDoubleQuotedLiteralGrammar")),
 )
 
 
@@ -114,9 +115,7 @@ class CreateTableStatementSegment(BaseSegment):
                         ),
                     )
                 ),
-                Sequence(  # [COMMENT 'string']
-                    "COMMENT", Ref("QuotedLiteralSegment"), optional=True
-                ),
+                Ref("CommentGrammar", optional=True),
                 Sequence(  # [PARTITONED BY (col_name data_type [COMMENT col_comment], ...)]
                     "PARTITIONED",
                     "BY",
@@ -216,6 +215,7 @@ class DatatypeSegment(BaseSegment):
                         Ref("NakedIdentifierSegment"),
                         Ref("ColonSegment"),
                         Ref("DatatypeSegment"),
+                        Ref("CommentGrammar", optional=True),
                     ),
                 ),
                 bracket_type="angle",
@@ -264,7 +264,7 @@ class RowFormatClauseSegment(BaseSegment):
                     "FIELDS",
                     Ref("TerminatedByGrammar"),
                     Sequence(
-                        "ESCAPED", "BY", Ref("QuotedliteralSegment"), optional=True
+                        "ESCAPED", "BY", Ref("QuotedLiteralSegment"), optional=True
                     ),
                     optional=True,
                 ),
@@ -274,12 +274,12 @@ class RowFormatClauseSegment(BaseSegment):
                 Sequence("MAP", "KEYS", Ref("TerminatedByGrammar"), optional=True),
                 Sequence("LINES", Ref("TerminatedByGrammar"), optional=True),
                 Sequence(
-                    "NULL", "DEFINED", "AS", Ref("QuotedliteralSegment"), optional=True
+                    "NULL", "DEFINED", "AS", Ref("QuotedLiteralSegment"), optional=True
                 ),
             ),
             Sequence(
                 "SERDE",
-                Ref("QuotedLiteralSegment"),
+                Ref("SingleOrDoubleQuotedLiteralGrammar"),
                 Ref("SerdePropertiesGrammar", optional=True),
             ),
         ),
