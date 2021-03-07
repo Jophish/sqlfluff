@@ -9,6 +9,7 @@ from sqlfluff.core.parser import (
     Delimited,
     StartsWith,
     NamedSegment,
+    GreedyUntil,
 )
 
 from sqlfluff.core.dialects.dialect_ansi import ansi_dialect
@@ -19,7 +20,7 @@ hive_dialect = ansi_dialect.copy_as("hive")
 # Clear ANSI Keywords and add all Hive keywords
 # hive_dialect.sets("unreserved_keywords").clear()
 hive_dialect.sets("unreserved_keywords").update(UNRESERVED_KEYWORDS)
-hive_dialect.sets("reserved_keywords").clear()
+# hive_dialect.sets("reserved_keywords").clear()
 hive_dialect.sets("reserved_keywords").update(RESERVED_KEYWORDS)
 
 hive_dialect.sets("bracket_pairs").update(
@@ -80,6 +81,18 @@ hive_dialect.add(
         Ref("StoredByGrammar"),
     ),
     CommentGrammar=Sequence("COMMENT", Ref("SingleOrDoubleQuotedLiteralGrammar")),
+    PartitionSpecGrammar=Sequence(
+        "PARTITION",
+        Bracketed(
+            Delimited(
+                Sequence(
+                    Ref("ColumnReferenceSegment"),
+                    Ref("EqualsSegment"),
+                    Ref("LiteralGrammar"),
+                )
+            )
+        ),
+    ),
 )
 
 
@@ -285,4 +298,58 @@ class RowFormatClauseSegment(BaseSegment):
                 Ref("SerdePropertiesGrammar", optional=True),
             ),
         ),
+    )
+
+
+@hive_dialect.segment(replace=True)
+class DropStatementSegment(BaseSegment):
+    """A `DROP` statement without any options."""
+
+    type = "drop_statement"
+    match_grammar = StartsWith("DROP")
+    parse_grammar = OneOf(
+        Ref("DropTableStatementSegment"),
+    )
+
+
+@hive_dialect.segment()
+class DropTableStatementSegment(BaseSegment):
+    """A `DROP TABLE` statement."""
+
+    type = "drop_table_statement"
+    match_grammar = Sequence(
+        "DROP",
+        "TABLE",
+        Ref("IfExistsGrammar", optional=True),
+        Ref("TableReferenceSegment"),
+        Ref.keyword("PURGE", optional=True),
+    )
+
+
+@hive_dialect.segment()
+class TruncateStatementSegment(BaseSegment):
+    """`TRUNCATE TABLE` statement."""
+
+    type = "truncate_table"
+
+    match_grammar = StartsWith("TRUNCATE")
+    parse_grammar = Sequence(
+        "TRUNCATE",
+        Ref.keyword("TABLE", optional=True),
+        Ref("TableReferenceSegment"),
+        Ref("PartitionSpecGrammar", optional=True),
+    )
+
+
+@hive_dialect.segment(replace=True)
+class StatementSegment(BaseSegment):
+    """A generic segment, to any of its child subsegments."""
+
+    type = "statement"
+    match_grammar = GreedyUntil(Ref("SemicolonSegment"))
+
+    parse_grammar = OneOf(
+        Ref("CreateTableStatementSegment"),
+        Ref("DropStatementSegment"),
+        Ref("TruncateStatementSegment"),
     )
