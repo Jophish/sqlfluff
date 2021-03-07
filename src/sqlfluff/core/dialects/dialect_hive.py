@@ -44,11 +44,12 @@ hive_dialect.add(
         Ref("EqualsSegment"),
         Ref("SingleOrDoubleQuotedLiteralGrammar"),
     ),
+    BracketedPropertyListGrammar=Bracketed(Delimited(Ref("PropertyGrammar"))),
     TablePropertiesGrammar=Sequence(
-        "TBLPROPERTIES", Bracketed(Delimited(Ref("PropertyGrammar")))
+        "TBLPROPERTIES", Ref("BracketedPropertyListGrammar")
     ),
     SerdePropertiesGrammar=Sequence(
-        "WITH", "SERDEPROPERTIES", Bracketed(Delimited(Ref("PropertyGrammar")))
+        "WITH", "SERDEPROPERTIES", Ref("BracketedPropertyListGrammar")
     ),
     TerminatedByGrammar=Sequence("TERMINATED", "BY", Ref("QuotedLiteralSegment")),
     FileFormatGrammar=OneOf(
@@ -94,6 +95,23 @@ hive_dialect.add(
         ),
     ),
 )
+
+
+@hive_dialect.segment(replace=True)
+class CreateDatabaseStatementSegment(BaseSegment):
+    """A `CREATE DATABASE` statement."""
+
+    type = "create_database_statement"
+    match_grammar = Sequence(
+        "CREATE",
+        OneOf("DATABASE", "SCHEMA"),
+        Ref("IfNotExistsGrammar", optional=True),
+        Ref("DatabaseReferenceSegment"),
+        Ref("CommentGrammar", optional=True),
+        Ref("LocationGrammar", optional=True),
+        Sequence("MANAGEDLOCATION", Ref("QuotedLiteralSegment"), optional=True),
+        Sequence("WITH", "DBPROPERTIES", Ref("BracketedPropertyListGrammar"), optional=True),
+    )
 
 
 @hive_dialect.segment(replace=True)
@@ -301,14 +319,49 @@ class RowFormatClauseSegment(BaseSegment):
     )
 
 
+@hive_dialect.segment()
+class AlterDatabaseStatementSegment(BaseSegment):
+    """An `ALTER DATABASE` statement."""
+
+    type = "alter_database_statement"
+    match_grammar = Sequence(
+        "ALTER",
+        OneOf("DATABASE", "SCHEMA"),
+        Ref("DatabaseReferenceSegment"),
+        "SET",
+        OneOf(
+            Sequence("DBPROPERTIES", Ref("BracketedPropertyListGrammar")),
+            Sequence("OWNER", OneOf("USER", "ROLE"), Ref("QuotedLiteralSegment")),
+            Ref("LocationGrammar"),
+            Sequence("MANAGEDLOCATION", Ref("QuotedLiteralSegment")),
+        ),
+    )
+
+
 @hive_dialect.segment(replace=True)
 class DropStatementSegment(BaseSegment):
-    """A `DROP` statement without any options."""
+    """A `DROP` statement."""
 
     type = "drop_statement"
     match_grammar = StartsWith("DROP")
     parse_grammar = OneOf(
+        Ref("DropDatabaseStatementSegment"),
         Ref("DropTableStatementSegment"),
+        # TODO: add other drops
+    )
+
+
+@hive_dialect.segment()
+class DropDatabaseStatementSegment(BaseSegment):
+    """A `DROP TABLE` statement."""
+
+    type = "drop_table_statement"
+    match_grammar = Sequence(
+        "DROP",
+        OneOf("DATABASE", "SCHEMA"),
+        Ref("IfExistsGrammar", optional=True),
+        Ref("DatabaseReferenceSegment"),
+        OneOf("RESTRICT", "CASCADE", optional=True),
     )
 
 
@@ -341,6 +394,17 @@ class TruncateStatementSegment(BaseSegment):
     )
 
 
+@hive_dialect.segment()
+class UseStatementSegment(BaseSegment):
+    """An `USE` statement."""
+
+    type = "use_statement"
+    match_grammar = Sequence(
+        "USE",
+        Ref("DatabaseReferenceSegment"),
+    )
+
+
 @hive_dialect.segment(replace=True)
 class StatementSegment(BaseSegment):
     """A generic segment, to any of its child subsegments."""
@@ -349,7 +413,10 @@ class StatementSegment(BaseSegment):
     match_grammar = GreedyUntil(Ref("SemicolonSegment"))
 
     parse_grammar = OneOf(
+        Ref("CreateDatabaseStatementSegment"),
+        Ref("AlterDatabaseStatementSegment"),
         Ref("CreateTableStatementSegment"),
         Ref("DropStatementSegment"),
         Ref("TruncateStatementSegment"),
+        Ref("UseStatementSegment"),
     )

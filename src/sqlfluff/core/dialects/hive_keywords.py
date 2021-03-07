@@ -332,4 +332,6 @@ UNRESERVED_KEYWORDS = [
     "PARQUET",
     "AVRO",
     "JSONFILE",
+    # Other
+    "MANAGEDLOCATION",
 ]
