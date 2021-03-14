@@ -5,6 +5,7 @@ from sqlfluff.core.parser import (
     Sequence,
     Ref,
     OneOf,
+    AnyNumberOf,
     Bracketed,
     Delimited,
     StartsWith,
@@ -94,8 +95,66 @@ hive_dialect.add(
             )
         ),
     ),
+    InsertDynamicPartitionSpecGrammar=Sequence(
+        "PARTITION",
+        Delimited(
+            Sequence(
+                Ref("NakedIdentifierSegment"),
+                Sequence(
+                    Ref("EqualsSegment"),
+                    Ref("NakedIdentifierSegment"),
+                    optional=True
+                )
+            )
+        )
+    ),
+    InsertPartitionSpecGrammar=Sequence(
+        "PARTITION",
+        Delimited(
+            Sequence(
+                Ref("NakedIdentifierSegment"),
+                Ref("EqualsSegment"),
+                Ref("NakedIdentifierSegment"),
+            )
+        )
+    ),
+    InsertNormalOrDynamicPartitionSpecGrammar=OneOf(
+        Ref("InsertDynamicPartitionSpecGrammar"),
+        Ref("InsertPartitionSpecGrammar")
+    )
 )
 
+@hive_dialect.segment()
+class LoadDataStatementSegment(BaseSegment):
+    """`LOAD DATA` statement."""
+
+    type = "load_data_statement"
+    match_grammar = StartsWith(
+        Sequence(
+            "LOAD",
+            "DATA",
+        )
+    )
+
+    parse_grammar = Sequence(
+        "LOAD",
+        "DATA",
+        Ref.keyword("LOCAL", optional=True),
+        "INPATH",
+        Ref("QuotedLiteralSegment"),
+        Ref.keyword("OVERWRITE", optional=True),
+        "INTO",
+        "TABLE",
+        Ref("TableReferenceSegment"),
+        Ref("InsertPartitionSpecGrammar", optional=True),
+        Sequence(
+            "INPUTFORMAT",
+            Ref("QuotedLiteralSegment"),
+            "SERDE",
+            Ref("QuotedLiteralSegment"),
+            optional=True
+        )
+    )
 
 @hive_dialect.segment(replace=True)
 class CreateDatabaseStatementSegment(BaseSegment):
@@ -404,6 +463,46 @@ class UseStatementSegment(BaseSegment):
         Ref("DatabaseReferenceSegment"),
     )
 
+@hive_dialect.segment()
+class InsertStatementFragmentSegment(BaseSegment):
+    """An `INSERT` fragment used in multiple different types of `INSERT` statements"""
+
+    type = "insert_statement_fragment"
+
+    match_grammar = Sequence(
+        "INSERT",
+        OneOf(
+            Sequence(
+                "OVERWRITE",
+                "TABLE",
+                Ref("TableReferenceSegment"),
+                Ref("InsertNormalOrDynamicPartitionSpecGrammar", optional=True),
+                Ref("IfNotExistsGrammar", optional=True)
+                ),
+            Sequence(
+                "INTO",
+                "TABLE",
+                Ref("TableReferenceSegment"),
+                Ref("InsertNormalOrDynamicPartitionSpecGrammar", optional=True)
+            )
+        ),
+    )
+
+@hive_dialect.segment(replace=True)
+class InsertStatementSegment(BaseSegment):
+    """An `INSERT` statement"""
+
+    type = "insert_statement"
+    match_grammar = OneOf(
+        Sequence(
+            Ref("InsertStatementFragmentSegment"),
+            Ref("FromClauseSegment")
+        ),
+        Sequence(
+            Ref("FromClauseSegment"),
+            Ref("InsertStatementFragmentSegment")
+        )
+    )
 
 @hive_dialect.segment(replace=True)
 class StatementSegment(BaseSegment):
@@ -419,4 +518,6 @@ class StatementSegment(BaseSegment):
         Ref("DropStatementSegment"),
         Ref("TruncateStatementSegment"),
         Ref("UseStatementSegment"),
+        Ref("LoadDataStatementSegment"),
+        Ref("InsertStatementSegment")
     )
